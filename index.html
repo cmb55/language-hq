@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Language HQ</title>
+<meta name="description" content="Personal conductor for a four-language self-study program.">
+<meta name="theme-color" content="#0e1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lang HQ">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main id="app"></main>
+<nav class="tabs" aria-label="Sections">
+  <button type="button" data-act="nav" data-view="today">Today</button>
+  <button type="button" data-act="nav" data-view="week">Week</button>
+  <button type="button" data-act="nav" data-view="sunday">Sunday</button>
+  <button type="button" data-act="nav" data-view="settings">Setup</button>
+</nav>
+<noscript><p style="padding:20px">Language HQ needs JavaScript.</p></noscript>
+
+<script>
+'use strict';
+
+/* =============================================================
+   Storage — one JSON document under one localStorage key.
+   The schema is versioned; every change to it needs a migration.
+   ============================================================= */
+
+const STORAGE_KEY = 'language-hq';
+const SCHEMA_VERSION = 1;
+
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+
+function seed() {
+  return {
+    schemaVersion: 1,
+    settings: { weekStartsMonday: true, timezone: 'America/Chicago' },
+    languages: [
+      { id: 'no', name: 'Norwegian (Bokmål)', code: 'NO', color: '#4f7cd9', tier: 'build', phase: 'ph-no-1',
+        current: 'A0', target: 'A2 oral (permanent residence), then B1 oral (citizenship)' },
+      { id: 'es', name: 'Spanish', code: 'ES', color: '#e0a832', tier: 'push', phase: 'ph-es-1',
+        current: 'B1–B2 (placement pending)', target: 'C2 (DELE)' },
+      { id: 'ja', name: 'Japanese', code: 'JA', color: '#d05a6e', tier: 'maintain', phase: 'ph-ja-1',
+        current: '~N3 (placement pending)', target: 'N2, then N1' },
+      { id: 'zh', name: 'Chinese', code: 'ZH', color: '#8a94a6', tier: 'parked', phase: null,
+        current: 'dormant (was ~A1)', target: 'reactivate when Norwegian reaches A2' }
+    ],
+    resources: [
+      // Norwegian
+      { id: 'now1', langId: 'no', lane: 'course', name: 'Norwegian on the Web 1', url: 'https://www.ntnu.edu/now', cursor: { label: 'chapter', value: 1 }, active: true, notes: '' },
+      { id: 'now2', langId: 'no', lane: 'course', name: 'NoW2', url: 'https://www.ntnu.edu/now2', cursor: { label: 'chapter', value: 1 }, active: false, notes: 'Inactive until phase 2.' },
+      { id: 'anki-no', langId: 'no', lane: 'srs', name: 'Anki (AnkiMobile + AnkiWeb)', url: 'https://apps.ankiweb.net', cursor: null, active: true, notes: '' },
+      { id: 'nfb', langId: 'no', lane: 'input', name: 'Norsk for Beginners (podcast)', url: '', cursor: { label: 'episode', value: 1 }, active: true, notes: '' },
+      { id: 'lnn', langId: 'no', lane: 'input', name: 'Lær norsk nå!', url: '', cursor: { label: 'episode', value: 1 }, active: false, notes: 'Inactive until phase 2.' },
+      { id: 'klartale', langId: 'no', lane: 'input', name: 'Klar Tale', url: 'https://www.klartale.no', cursor: null, active: false, notes: 'Inactive until phase 2.' },
+      { id: 'forvo', langId: 'no', lane: 'reference', name: 'Forvo', url: 'https://forvo.com', cursor: null, active: true, notes: '' },
+      { id: 'ordbokene', langId: 'no', lane: 'reference', name: 'Ordbøkene', url: 'https://ordbokene.no', cursor: null, active: true, notes: '' },
+      { id: 'hkdir', langId: 'no', lane: 'exam', name: 'HK-dir Norskprøven samples and registration', url: 'https://prove.hkdir.no', cursor: null, active: true, notes: '' },
+      { id: 'muntlig', langId: 'no', lane: 'exam', name: 'muntlig.com', url: 'https://muntlig.com', cursor: null, active: false, notes: 'Inactive until phase 3.' },
+      // Spanish
+      { id: 'kwiziq', langId: 'es', lane: 'course', name: 'Kwiziq Spanish', url: 'https://spanish.kwiziq.com', cursor: { label: 'level', value: 'placement pending' }, active: true, notes: '' },
+      { id: 'anki-es', langId: 'es', lane: 'srs', name: 'Anki', url: 'https://apps.ankiweb.net', cursor: null, active: true, notes: '' },
+      { id: 'radioamb', langId: 'es', lane: 'input', name: 'Radio Ambulante', url: 'https://radioambulante.org', cursor: { label: 'episode', value: 'latest' }, active: true, notes: '' },
+      { id: 'elhilo', langId: 'es', lane: 'input', name: 'El Hilo', url: 'https://elhilo.audio', cursor: null, active: true, notes: '' },
+      { id: 'langcorrect', langId: 'es', lane: 'output', name: 'LangCorrect', url: 'https://langcorrect.com', cursor: { label: 'entries', value: 0 }, active: true, notes: '' },
+      { id: 'dele', langId: 'es', lane: 'exam', name: 'Instituto Cervantes DELE models', url: 'https://examenes.cervantes.es', cursor: null, active: true, notes: '' },
+      { id: 'cronometro', langId: 'es', lane: 'exam', name: 'El Cronómetro C2 (book)', url: '', cursor: null, active: false, notes: 'Inactive until phase 2.' },
+      { id: 'siele', langId: 'es', lane: 'exam', name: 'SIELE', url: 'https://siele.org', cursor: null, active: true, notes: '' },
+      // Japanese
+      { id: 'bunpro', langId: 'ja', lane: 'course', name: 'Bunpro', url: 'https://bunpro.jp', cursor: { label: 'JLPT level', value: 'placement pending' }, active: true, notes: '' },
+      { id: 'anki-ja', langId: 'ja', lane: 'srs', name: 'Anki + Yomitan', url: 'https://apps.ankiweb.net', cursor: null, active: true, notes: '' },
+      { id: 'satori', langId: 'ja', lane: 'input', name: 'Satori Reader', url: 'https://www.satorireader.com', cursor: { label: 'episode', value: 'choose a series' }, active: true, notes: '' },
+      { id: 'nhk', langId: 'ja', lane: 'input', name: 'NHK News Web Easy', url: 'https://www3.nhk.or.jp/news/easy/', cursor: null, active: true, notes: '' },
+      { id: 'yuyu', langId: 'ja', lane: 'input', name: 'YUYU Nihongo Podcast', url: '', cursor: null, active: true, notes: '' },
+      { id: 'jlpt', langId: 'ja', lane: 'exam', name: 'JLPT official samples', url: 'https://www.jlpt.jp/e/', cursor: null, active: true, notes: '' },
+      { id: 'skm', langId: 'ja', lane: 'exam', name: 'Shin Kanzen Master (book)', url: '', cursor: null, active: false, notes: 'Inactive until phase 2.' },
+      // Chinese (parked — all inactive)
+      { id: 'hellochinese', langId: 'zh', lane: 'course', name: 'HelloChinese', url: '', cursor: null, active: false, notes: '' },
+      { id: 'duchinese', langId: 'zh', lane: 'input', name: 'Du Chinese', url: '', cursor: null, active: false, notes: '' },
+      { id: 'pleco', langId: 'zh', lane: 'reference', name: 'Pleco', url: '', cursor: null, active: false, notes: '' },
+      { id: 'anki-zh', langId: 'zh', lane: 'srs', name: 'Anki HSK deck', url: '', cursor: null, active: false, notes: '' }
+    ],
+    recipes: [
+      { id: 'r-no-chapter', langId: 'no', name: 'NO-chapter', steps: [
+        { minutes: 8, text: 'Anki reviews, new cards capped at 10/day', resourceId: 'anki-no' },
+        { minutes: 12, text: 'NoW chapter: read the text with audio, one grammar point', resourceId: 'now1' },
+        { minutes: 10, text: 'Shadow the chapter audio twice, then record a 60–90 s monologue on the chapter topic; save it to the island bank' }
+      ]},
+      { id: 'r-no-consolidate', langId: 'no', name: 'NO-consolidate', steps: [
+        { minutes: 10, text: 'Pronunciation: minimal pairs from the week’s words, listen to 5+ different speakers on Forvo, then record yourself', resourceId: 'forvo' },
+        { minutes: 10, text: 'Re-record the week’s best monologue and compare with the first take' },
+        { minutes: 10, text: 'Anki reviews plus a pass through open Norwegian error patterns', resourceId: 'anki-no' }
+      ]},
+      { id: 'r-es-input', langId: 'es', name: 'ES-input', steps: [
+        { minutes: 20, text: 'Radio Ambulante or El Hilo segment with the transcript', resourceId: 'radioamb' },
+        { minutes: 10, text: '5–8 sentences into Anki as sentence cards', resourceId: 'anki-es' }
+      ]},
+      { id: 'r-es-output', langId: 'es', name: 'ES-output', steps: [
+        { minutes: 15, text: 'Write 150–200 words on Monday’s topic' },
+        { minutes: 15, text: 'Post to LangCorrect; quick pass with Claude using the correction prompt; log one error pattern', resourceId: 'langcorrect' }
+      ]},
+      { id: 'r-es-precision', langId: 'es', name: 'ES-precision', steps: [
+        { minutes: 15, text: 'Kwiziq lessons and kwiz', resourceId: 'kwiziq' },
+        { minutes: 15, text: 'Drill open Spanish error patterns; Anki reviews', resourceId: 'anki-es' }
+      ]},
+      { id: 'r-ja-read', langId: 'ja', name: 'JA-read', steps: [
+        { minutes: 10, text: 'Anki reviews', resourceId: 'anki-ja' },
+        { minutes: 20, text: 'Satori Reader episode with audio, read aloud once', resourceId: 'satori' }
+      ]},
+      { id: 'r-ja-grammar', langId: 'ja', name: 'JA-grammar', steps: [
+        { minutes: 10, text: 'Bunpro reviews', resourceId: 'bunpro' },
+        { minutes: 12, text: 'NHK News Web Easy article or one podcast segment', resourceId: 'nhk' },
+        { minutes: 8, text: 'Record a 90 s summary, or write 5 lines to Claude with the output prompt' }
+      ]},
+      { id: 'r-sun-no-speaking', langId: 'no', name: 'SUN-norwegian-speaking', steps: [
+        { minutes: 15, text: 'Rehearse one Norskprøven muntlig task with Claude (voice if Norwegian is available, otherwise typed); paste the session prompt; log one error pattern' }
+      ]},
+      { id: 'r-sun-review', langId: null, name: 'SUN-review', steps: [
+        { minutes: 15, text: 'Copy the weekly summary into the Claude project; set next week’s cursors; close any error pattern that stayed clean for two weeks' }
+      ]}
+    ],
+    template: {
+      mon: ['no-chapter', 'es-input'],
+      tue: ['no-chapter', 'ja-read'],
+      wed: ['no-chapter', 'es-output'],
+      thu: ['no-chapter', 'ja-grammar'],
+      fri: ['no-consolidate', 'es-precision'],
+      sat: [],
+      sun: ['sun-no-speaking', 'sun-review']
+    },
+    blocks: [
+      { id: 'no-chapter', label: 'NO-chapter', langId: 'no', recipeId: 'r-no-chapter', minutes: 30, resourceId: 'now1', optional: false },
+      { id: 'no-consolidate', label: 'NO-consolidate', langId: 'no', recipeId: 'r-no-consolidate', minutes: 30, resourceId: 'forvo', optional: false },
+      { id: 'es-input', label: 'ES-input', langId: 'es', recipeId: 'r-es-input', minutes: 30, resourceId: 'radioamb', optional: false },
+      { id: 'es-output', label: 'ES-output', langId: 'es', recipeId: 'r-es-output', minutes: 30, resourceId: 'langcorrect', optional: false },
+      { id: 'es-precision', label: 'ES-precision', langId: 'es', recipeId: 'r-es-precision', minutes: 30, resourceId: 'kwiziq', optional: false },
+      { id: 'ja-read', label: 'JA-read', langId: 'ja', recipeId: 'r-ja-read', minutes: 30, resourceId: 'satori', optional: false },
+      { id: 'ja-grammar', label: 'JA-grammar', langId: 'ja', recipeId: 'r-ja-grammar', minutes: 30, resourceId: 'bunpro', optional: false },
+      { id: 'sun-no-speaking', label: 'SUN-norwegian-speaking', langId: 'no', recipeId: 'r-sun-no-speaking', minutes: 15, resourceId: null, optional: true },
+      { id: 'sun-review', label: 'SUN-review', langId: null, recipeId: 'r-sun-review', minutes: 15, resourceId: null, optional: true }
+    ],
+    sessions: [],
+    inputLog: [],
+    errors: [],
+    milestones: [
+      { id: 'ms-1', langId: 'ja', date: '2026-09-10', text: 'Decide on JLPT December sitting (US registration closes Sep 16; N3 is the low-stakes anchor)' },
+      { id: 'ms-2', langId: null, date: '2026-09-13', text: 'Week-2 keep-or-kill: Kwiziq, Satori Reader, LangCorrect, Norsk for Beginners' },
+      { id: 'ms-3', langId: 'es', date: '2026-09-25', text: 'DELE decision (register by Sep 30 or target May 2027)' },
+      { id: 'ms-4', langId: null, date: '2026-09-27', text: 'Month-1 review' }
+    ],
+    phases: [
+      { id: 'ph-no-1', langId: 'no', name: 'Foundation', level: 'A1–A2', active: true,
+        startsWhen: 'Months 1–3: NoW1, Norsk for Beginners, Anki new cards ≤10/day',
+        activates: ['now1', 'nfb'], deactivates: ['now2', 'lnn', 'klartale', 'muntlig'],
+        optional: { 'sun-no-speaking': true } },
+      { id: 'ph-no-2', langId: 'no', name: 'Build', level: 'B1', active: false,
+        startsWhen: 'Starts when NoW1 is finished: NoW2, Lær norsk nå!, Klar Tale; Sunday speaking becomes non-optional',
+        activates: ['now2', 'lnn', 'klartale'], deactivates: ['now1', 'nfb'],
+        optional: { 'sun-no-speaking': false } },
+      { id: 'ph-no-3', langId: 'no', name: 'Exam prep', level: 'B1', active: false,
+        startsWhen: 'Starts 4 weeks before a Norskprøven sitting: muntlig.com pass, full mocks, NRK for dialects',
+        activates: ['muntlig'], deactivates: [],
+        optional: { 'sun-no-speaking': false } },
+      { id: 'ph-es-1', langId: 'es', name: 'To C1', active: true,
+        startsWhen: 'Kwiziq until it reports C1',
+        activates: ['kwiziq'], deactivates: ['cronometro'], optional: {} },
+      { id: 'ph-es-2', langId: 'es', name: 'C1→C2', active: false,
+        startsWhen: 'Kwiziq slot becomes El Cronómetro tasks; SIELE benchmark',
+        activates: ['cronometro'], deactivates: ['kwiziq'], optional: {} },
+      { id: 'ph-ja-1', langId: 'ja', name: 'Maintain', active: true,
+        startsWhen: 'Now', activates: [], deactivates: [], optional: {} },
+      { id: 'ph-ja-2', langId: 'ja', name: 'JLPT prep', active: false,
+        startsWhen: 'Starts 4 months before a sitting: add Shin Kanzen Master',
+        activates: ['skm'], deactivates: [], optional: {} }
+    ]
+  };
+}
+
+function migrate(doc) {
+  if (!doc || typeof doc !== 'object') throw new Error('Not a Language HQ document');
+  const collections = ['languages', 'resources', 'recipes', 'blocks', 'sessions', 'inputLog', 'errors', 'milestones', 'phases'];
+  for (const k of collections) {
+    if (!Array.isArray(doc[k])) throw new Error('Not a Language HQ document (missing ' + k + ')');
+  }
+  if (!doc.template || typeof doc.template !== 'object') throw new Error('Not a Language HQ document (missing template)');
+  if (!doc.settings || typeof doc.settings !== 'object') throw new Error('Not a Language HQ document (missing settings)');
+  if (typeof doc.schemaVersion !== 'number') doc.schemaVersion = 1;
+  // Future migrations run here, in order. Example:
+  // if (doc.schemaVersion === 1) { /* transform */ doc.schemaVersion = 2; }
+  if (doc.schemaVersion > SCHEMA_VERSION) {
+    console.warn('Document schemaVersion ' + doc.schemaVersion + ' is newer than app (' + SCHEMA_VERSION + '); loading as-is.');
+  }
+  return doc;
+}
+
+function persist(doc) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
+  } catch (e) {
+    console.error('Could not save', e);
+  }
+}
+
+function load() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (e) {
+    console.warn('localStorage unavailable', e);
+  }
+  if (!raw) {
+    const d = seed();
+    persist(d);
+    return d;
+  }
+  try {
+    const d = migrate(JSON.parse(raw));
+    persist(d);
+    return d;
+  } catch (e) {
+    // Never lose data: stash the unreadable blob, then start fresh.
+    console.error('Stored data unreadable; backed up under ' + STORAGE_KEY + '.corrupt', e);
+    try { localStorage.setItem(STORAGE_KEY + '.corrupt', raw); } catch (e2) {}
+    const d = seed();
+    persist(d);
+    return d;
+  }
+}
+
+let db = load();
+const save = () => persist(db);
+
+/* ================= Helpers ================= */
+
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+const LANES = ['course', 'srs', 'input', 'output', 'exam', 'reference'];
+
+const pad2 = n => String(n).padStart(2, '0');
+const fmtDate = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+function parseDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const dayKey = d => DAYS[(d.getDay() + 6) % 7];
+const humanDate = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const humanDateFull = d => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+const dateOverride = (() => {
+  const q = new URLSearchParams(location.search).get('date');
+  return (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) ? q : null;
+})();
+const appToday = () => dateOverride ? parseDate(dateOverride) : new Date();
+const todayStr = () => fmtDate(appToday());
+
+function weekStartOf(d) {
+  const base = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const shift = db.settings.weekStartsMonday ? (base.getDay() + 6) % 7 : base.getDay();
+  return addDays(base, -shift);
+}
+
+const lang = id => db.languages.find(l => l.id === id) || null;
+const res = id => db.resources.find(r => r.id === id) || null;
+const block = id => db.blocks.find(b => b.id === id) || null;
+const recipe = id => db.recipes.find(r => r.id === id) || null;
+const activePhase = langId => db.phases.find(p => p.langId === langId && p.active) || null;
+const langColor = b => escapeHtml((b && b.langId && lang(b.langId)) ? lang(b.langId).color : '#8a94a6');
+const langCode = b => (b && b.langId && lang(b.langId)) ? lang(b.langId).code : 'SUN';
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
+
+// A block's resource on Today: the block's own resource if active; if a phase
+// swap deactivated it, fall back to the first active resource in the same
+// language + lane; inactive resources are otherwise hidden from Today.
+function blockResource(b) {
+  if (!b.resourceId) return null;
+  const orig = res(b.resourceId);
+  if (!orig) return null;
+  if (orig.active) return orig;
+  return db.resources.find(r => r.langId === orig.langId && r.lane === orig.lane && r.active) || null;
+}
+
+const sess = (dateStr, blockId) => db.sessions.find(s => s.date === dateStr && s.blockId === blockId) || null;
+
+function minutesFor(status, b) {
+  if (status === 'done') return b.minutes;
+  if (status === 'floor') return Math.min(10, b.minutes);
+  return 0;
+}
+
+function setStatus(dateStr, blockId, status) {
+  const b = block(blockId);
+  if (!b) return;
+  const existing = sess(dateStr, blockId);
+  if (existing && existing.status === status) {
+    db.sessions = db.sessions.filter(s => s !== existing); // tap again = undo
+  } else if (existing) {
+    existing.status = status;
+    existing.minutes = minutesFor(status, b);
+  } else {
+    db.sessions.push({ id: uid(), date: dateStr, blockId, status, minutes: minutesFor(status, b), note: '' });
+  }
+  save();
+}
+
+function cycleStatus(dateStr, blockId) {
+  const order = [null, 'done', 'floor', 'skipped'];
+  const cur = sess(dateStr, blockId);
+  const next = order[(order.indexOf(cur ? cur.status : null) + 1) % order.length];
+  if (next === null) {
+    db.sessions = db.sessions.filter(s => !(s.date === dateStr && s.blockId === blockId));
+    save();
+  } else {
+    setStatus(dateStr, blockId, next);
+  }
+}
+
+const inRange = (dateStr, startStr, endStr) => dateStr >= startStr && dateStr <= endStr;
+
+function weekScheduled(weekStart) {
+  // -> [{date, block, session}] for every templated block that counts this week.
+  // Optional blocks count only once they have a session (any status).
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(weekStart, i);
+    const ds = fmtDate(d);
+    for (const bid of (db.template[dayKey(d)] || [])) {
+      const b = block(bid);
+      if (!b) continue;
+      const s = sess(ds, bid);
+      if (b.optional && !s) continue;
+      out.push({ date: ds, block: b, session: s });
+    }
+  }
+  return out;
+}
+
+function weekStats(weekStart) {
+  const rows = weekScheduled(weekStart);
+  const st = { scheduled: rows.length, done: 0, floor: 0, skipped: 0, minutes: {}, byLang: {} };
+  for (const r of rows) {
+    const lid = r.block.langId || 'other';
+    st.byLang[lid] = st.byLang[lid] || { scheduled: 0, completed: 0, minutes: 0 };
+    st.byLang[lid].scheduled++;
+    if (r.session) {
+      if (r.session.status === 'done') st.done++;
+      else if (r.session.status === 'floor') st.floor++;
+      else st.skipped++;
+      if (r.session.status !== 'skipped') {
+        st.byLang[lid].completed++;
+        st.byLang[lid].minutes += r.session.minutes || 0;
+      }
+    }
+  }
+  return st;
+}
+
+function inputMinutesWeek(weekStart, langId) {
+  const startStr = fmtDate(weekStart), endStr = fmtDate(addDays(weekStart, 6));
+  return db.inputLog
+    .filter(e => e.langId === langId && inRange(e.date, startStr, endStr))
+    .reduce((a, e) => a + (e.minutes || 0), 0);
+}
+
+function fmtHours(min) {
+  const h = Math.round(min / 6) / 10;
+  return (h % 1 === 0) ? String(h) : h.toFixed(1);
+}
+
+/* ================= Weekly summary (§6 format) ================= */
+
+function buildWeeklySummary(weekStart) {
+  const end = addDays(weekStart, 6);
+  const startStr = fmtDate(weekStart), endStr = fmtDate(end);
+  const st = weekStats(weekStart);
+  const pct = st.scheduled ? Math.round(100 * (st.done + st.floor) / st.scheduled) : 0;
+
+  const cursorVal = id => { const r = res(id); return (r && r.cursor) ? String(r.cursor.value) : '—'; };
+  const langLine = lid => st.byLang[lid] || { scheduled: 0, completed: 0, minutes: 0 };
+
+  const noCourse = db.resources.find(r => r.langId === 'no' && r.lane === 'course' && r.active) || res('now1');
+  const shortNames = { now1: 'NoW1', now2: 'NoW2' };
+  const noCourseName = shortNames[noCourse && noCourse.id] || (noCourse ? noCourse.name : 'NoW1');
+  const noCursor = (noCourse && noCourse.cursor) ? (noCourseName + ' ch ' + noCourse.cursor.value) : noCourseName;
+  const monologues = db.sessions.filter(s =>
+    s.blockId === 'no-chapter' && s.status === 'done' && inRange(s.date, startStr, endStr)).length;
+
+  const errOpened = db.errors.filter(e => inRange(e.opened, startStr, endStr)).map(e => e.text);
+  const errClosed = db.errors.filter(e => e.closed && inRange(e.closed, startStr, endStr)).map(e => e.text);
+  const ms = db.milestones.filter(m => inRange(m.date, startStr, endStr)).map(m => m.date + ' ' + m.text);
+  const notes = db.sessions.filter(s => s.note && inRange(s.date, startStr, endStr)).map(s => s.note);
+  const listOr = (arr, fallback) => arr.length ? arr.join('; ') : fallback;
+
+  const no = langLine('no'), es = langLine('es'), ja = langLine('ja');
+  return [
+    'Week of ' + startStr + ' – ' + endStr,
+    'Completion: ' + (st.done + st.floor) + '/' + st.scheduled + ' blocks (' + pct + '%), floors: ' + st.floor + ', skips: ' + st.skipped,
+    'Norwegian: ' + no.completed + '/' + no.scheduled + ', ' + no.minutes + ' min · cursor: ' + noCursor + ' · monologues recorded: ' + monologues,
+    'Spanish: ' + es.completed + '/' + es.scheduled + ', ' + es.minutes + ' min · input this week: ' + fmtHours(inputMinutesWeek(weekStart, 'es')) + ' h · Kwiziq: ' + cursorVal('kwiziq') + ' · LangCorrect entries: ' + cursorVal('langcorrect'),
+    'Japanese: ' + ja.completed + '/' + ja.scheduled + ', ' + ja.minutes + ' min · input: ' + fmtHours(inputMinutesWeek(weekStart, 'ja')) + ' h · Satori: ' + cursorVal('satori') + ' · Bunpro: ' + cursorVal('bunpro'),
+    'Errors opened: ' + listOr(errOpened, 'none') + ' | closed: ' + listOr(errClosed, 'none'),
+    'Milestones: ' + listOr(ms, 'none'),
+    'Notes: ' + listOr(notes, 'none'),
+    'Ask: propose next week\'s cursors and one precision focus per language.'
+  ].join('\n');
+}
+
+/* ================= Prompt texts (§7) ================= */
+
+const NO_PROMPT_TEMPLATE = 'Vi snakker bare norsk (bokmål). Hold deg på nivå {level}. Still oppfølgingsspørsmål og ikke rett meg underveis. Vi øver på én oppgave fra Norskprøven muntlig: {task}. Etter 15 minutter: en liste «Corrections» på engelsk — min setning → rettet setning → regelen, én linje hver — og oppgi hvor jeg kan sjekke regelen (NoW-kapittel eller ordbokene.no). Dersom du er usikker på en regel, si det.';
+
+const ES_PROMPT = 'Corrige este texto como examinador DELE C1. Primero la versión corregida completa; luego una tabla original → corrección → regla; al final, un solo patrón que debo añadir a mi registro de errores. Si no estás seguro de una regla, dilo.';
+
+const JA_PROMPT = '今日読んだ内容について要約を書きます。N2レベルで直してください。最後に、覚えるべきパターンを一つだけ教えてください。規則に自信がない場合はそう言ってください。';
+
+function noPrompt() {
+  const ph = activePhase('no');
+  return NO_PROMPT_TEMPLATE.replace('{level}', (ph && ph.level) || 'A1–A2');
+}
+
+const PROBE_TEXT = 'Monthly probe (first Sunday): Norwegian — one HK-dir sample task, timed. Spanish — one Cervantes model task. Japanese — one JLPT sample section.';
+
+const FLOOR_RULE = 'Floor = Norwegian Anki reviews + one NoW text read aloud (10 min). Counts as a completed day.';
+
+/* ================= Rendering ================= */
+
+const app = document.getElementById('app');
+let weekOffset = 0;
+
+function currentView() {
+  const h = location.hash.replace('#', '');
+  return ['today', 'week', 'sunday', 'settings'].includes(h) ? h : 'today';
+}
+
+function render() {
+  const view = currentView();
+  document.querySelectorAll('nav.tabs button').forEach(b => {
+    if (b.dataset.view === view) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
+  if (view === 'today') app.innerHTML = renderToday();
+  else if (view === 'week') app.innerHTML = renderWeek();
+  else if (view === 'sunday') app.innerHTML = renderSunday();
+  else app.innerHTML = renderSettings();
+}
+
+/* ---------- Today ---------- */
+
+function renderToday() {
+  const t = appToday();
+  const ds = fmtDate(t);
+  const key = dayKey(t);
+  const blockIds = db.template[key] || [];
+  const activeLangs = db.languages.filter(l => l.tier !== 'parked');
+  const phaseLine = activeLangs.map(l => {
+    const p = activePhase(l.id);
+    return escapeHtml(l.code + ' ' + (p ? p.name : '—'));
+  }).join(' · ');
+
+  let html = '<header>' +
+    '<div class="row spread"><h1>' + escapeHtml(t.toLocaleDateString('en-US', { weekday: 'long' })) + '</h1>' +
+    '<span class="muted">' + escapeHtml(t.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) + '</span></div>' +
+    '<p class="muted small phase-line">' + phaseLine + '</p>' +
+    (dateOverride ? '<p class="callout">Viewing as ' + escapeHtml(dateOverride) + ' (from the ?date= URL parameter).</p>' : '') +
+    '</header>';
+
+  if (blockIds.length === 0) {
+    html += '<div class="empty card"><p>Nothing scheduled. Evening input still counts.</p></div>';
+  } else {
+    for (const bid of blockIds) {
+      html += renderBlockCard(bid, ds);
+    }
+  }
+
+  html += '<p class="callout">' + escapeHtml(FLOOR_RULE) + '</p>';
+
+  // Error pattern
+  const activeErrLangs = db.languages.filter(l => l.tier !== 'parked');
+  // Most recent first; same-day ties break on insertion order (later = newer).
+  const openErrors = db.errors
+    .map((e, i) => ({ e, i }))
+    .filter(x => !x.e.closed)
+    .sort((a, b) => b.e.opened.localeCompare(a.e.opened) || b.i - a.i)
+    .slice(0, 3)
+    .map(x => x.e);
+  html += '<section aria-labelledby="h-errors"><h2 id="h-errors">Error pattern</h2>' +
+    '<div class="row">' +
+    '<input type="text" id="err-text" aria-label="Error pattern" placeholder="e.g. NO: word order after fordi" style="flex:1;min-width:180px">' +
+    '<select id="err-lang" aria-label="Error language">' +
+    activeErrLangs.map(l => '<option value="' + escapeHtml(l.id) + '">' + escapeHtml(l.code) + '</option>').join('') +
+    '</select>' +
+    '<button type="button" data-act="error-save">Save</button>' +
+    '</div>';
+  if (openErrors.length) {
+    html += '<div class="card">' + openErrors.map(e => {
+      const l = lang(e.langId);
+      return '<div class="err-item"><span class="err-text"><strong>' + escapeHtml(l ? l.code : '—') + '</strong> ' +
+        escapeHtml(e.text) + '</span><span class="muted small">' + escapeHtml(e.opened) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  html += '</section>';
+
+  // Evening input
+  const todayInput = db.inputLog.filter(e => e.date === ds);
+  const totalMin = todayInput.reduce((a, e) => a + e.minutes, 0);
+  html += '<section aria-labelledby="h-input"><h2 id="h-input">Evening input</h2>' +
+    '<div class="row">' +
+    '<button type="button" data-act="input-quick" data-lang="es">+30 Spanish</button>' +
+    '<button type="button" data-act="input-quick" data-lang="ja">+30 Japanese</button>' +
+    '<button type="button" data-act="input-quick" data-lang="no">+30 Norwegian</button>' +
+    '</div>' +
+    '<div class="row" style="margin-top:8px">' +
+    '<input type="number" id="custom-min" min="1" max="600" aria-label="Custom minutes" placeholder="min" style="width:5.5em">' +
+    '<select id="custom-lang" aria-label="Custom input language">' +
+    activeErrLangs.map(l => '<option value="' + escapeHtml(l.id) + '">' + escapeHtml(l.code) + '</option>').join('') +
+    '</select>' +
+    '<button type="button" data-act="input-add">Add</button>' +
+    '</div>' +
+    '<p class="small">Today: <strong>' + totalMin + ' min</strong>' +
+    (todayInput.length ? ' — ' + todayInput.map(e => {
+      const l = lang(e.langId);
+      return '<button type="button" class="chip" style="border-style:solid" data-act="input-del" data-id="' + escapeHtml(e.id) + '" aria-label="Remove ' +
+        escapeHtml((l ? l.code : '') + ' ' + e.minutes) + ' minutes">' + escapeHtml((l ? l.code : '') + ' ' + e.minutes) + ' ×</button>';
+    }).join(' ') : '') +
+    '</p></section>';
+
+  return html;
+}
+
+function renderBlockCard(bid, ds) {
+  const b = block(bid);
+  if (!b) return '';
+  const r = recipe(b.recipeId);
+  const resource = blockResource(b);
+  const s = sess(ds, bid);
+  const color = langColor(b);
+
+  let html = '<article class="card block" style="--lang:' + color + '">' +
+    '<div class="block-head"><div class="block-title"><h3>' + escapeHtml(b.label) + '</h3>' +
+    '<span class="muted small">' + b.minutes + ' min</span>' +
+    (b.optional ? '<span class="chip">optional</span>' : '') +
+    '</div></div>';
+
+  if (r && r.steps.length) {
+    html += '<ol class="steps">' + r.steps.map(st =>
+      '<li><span class="min">' + st.minutes + '′</span><span>' + escapeHtml(st.text) + '</span></li>'
+    ).join('') + '</ol>';
+  }
+
+  if (resource) {
+    html += '<div class="res-row">';
+    if (resource.url) {
+      html += '<a href="' + escapeHtml(resource.url) + '" target="_blank" rel="noopener">' + escapeHtml(resource.name) + ' ↗</a>';
+    } else {
+      html += '<span>' + escapeHtml(resource.name) + '</span>';
+    }
+    if (resource.cursor) {
+      if (typeof resource.cursor.value === 'number') {
+        html += '<span class="cursor">' + escapeHtml(resource.cursor.label) + ' <b>' + resource.cursor.value + '</b>' +
+          '<button type="button" data-act="cursor-inc" data-res="' + escapeHtml(resource.id) + '" aria-label="Advance ' +
+          escapeHtml(resource.cursor.label) + ' to ' + (resource.cursor.value + 1) + '">+1</button></span>';
+      } else {
+        html += '<label class="cursor" style="flex-direction:row;align-items:center">' + escapeHtml(resource.cursor.label) +
+          ' <input type="text" data-chg="cursor-set" data-res="' + escapeHtml(resource.id) + '" value="' + escapeHtml(resource.cursor.value) + '"></label>';
+      }
+    }
+    html += '</div>';
+  }
+
+  const btn = (status, text) => {
+    const on = s && s.status === status;
+    return '<button type="button" class="sbtn s-' + status + '" data-act="status" data-block="' + escapeHtml(bid) +
+      '" data-date="' + ds + '" data-status="' + status + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + text + '</button>';
+  };
+  html += '<div class="status-btns">' + btn('done', 'Done') + btn('floor', 'Floor') + btn('skipped', 'Skip') + '</div>';
+
+  if (s) {
+    html += '<div class="note-row"><input type="text" data-chg="note-set" data-session="' + escapeHtml(s.id) +
+      '" value="' + escapeHtml(s.note || '') + '" placeholder="Session note (goes into the weekly summary)" aria-label="Session note for ' +
+      escapeHtml(b.label) + '"></div>';
+  }
+
+  html += '</article>';
+  return html;
+}
+
+/* ---------- Week ---------- */
+
+function renderWeek() {
+  const start = addDays(weekStartOf(appToday()), weekOffset * 7);
+  const end = addDays(start, 6);
+  const tStr = todayStr();
+
+  let html = '<header><h1>Week</h1></header>' +
+    '<div class="week-nav">' +
+    '<button type="button" data-act="week-prev" aria-label="Previous week">‹</button>' +
+    '<span>' + escapeHtml(humanDate(start) + ' – ' + humanDate(end) + ', ' + end.getFullYear()) + '</span>' +
+    (weekOffset !== 0 ? '<button type="button" data-act="week-now">Now</button>' : '') +
+    '<button type="button" data-act="week-next" aria-label="Next week">›</button>' +
+    '</div>';
+
+  html += '<div class="week-grid">';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(start, i);
+    const ds = fmtDate(d);
+    const key = dayKey(d);
+    html += '<div class="day-col"><div class="day-head' + (ds === tStr ? ' today' : '') + '">' +
+      escapeHtml(DAY_NAMES[key].slice(0, 3)) + '<br>' + d.getDate() + '</div>';
+    for (const bid of (db.template[key] || [])) {
+      const b = block(bid);
+      if (!b) continue;
+      const s = sess(ds, bid);
+      const cls = ['tile', s ? 't-' + s.status : 't-pending', b.optional ? 't-optional' : ''].join(' ');
+      const short = (b.label.split('-').slice(1).join('-') || b.label).slice(0, 6);
+      html += '<button type="button" class="' + cls + '" style="--lang:' + langColor(b) + '" data-act="tile-cycle" data-block="' + escapeHtml(bid) +
+        '" data-date="' + ds + '" aria-label="' + escapeHtml(b.label + ' on ' + ds + ': ' + (s ? s.status : 'pending') + '. Tap to change.') + '">' +
+        '<span class="code">' + escapeHtml(langCode(b)) + '</span>' + escapeHtml(short) + '</button>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  const st = weekStats(start);
+  const pct = st.scheduled ? Math.round(100 * (st.done + st.floor) / st.scheduled) : 0;
+  const startStr = fmtDate(start), endStr = fmtDate(end);
+  const langMin = db.languages.filter(l => l.tier !== 'parked')
+    .map(l => l.code + ' ' + ((st.byLang[l.id] && st.byLang[l.id].minutes) || 0) + ' min').join(' · ');
+  const inputLine = db.languages.filter(l => l.tier !== 'parked')
+    .map(l => l.code + ' ' + fmtHours(inputMinutesWeek(start, l.id)) + ' h').join(' · ');
+  const errOpened = db.errors.filter(e => inRange(e.opened, startStr, endStr)).length;
+  const errClosed = db.errors.filter(e => e.closed && inRange(e.closed, startStr, endStr)).length;
+
+  html += '<div class="card stats"><table>' +
+    '<tr><td>Completion</td><td><strong>' + (st.done + st.floor) + '/' + st.scheduled + '</strong> (' + pct + '%) · floors ' + st.floor + ' · skips ' + st.skipped + '</td></tr>' +
+    '<tr><td>Block minutes</td><td>' + escapeHtml(langMin) + '</td></tr>' +
+    '<tr><td>Input hours</td><td>' + escapeHtml(inputLine) + '</td></tr>' +
+    '<tr><td>Errors</td><td>opened ' + errOpened + ' · closed ' + errClosed + '</td></tr>' +
+    '</table></div>';
+
+  html += '<p class="muted small">Tap a tile to cycle: pending → done → floor → skipped → pending. Dashed = optional.</p>';
+  return html;
+}
+
+/* ---------- Sunday ---------- */
+
+function renderSunday() {
+  const t = appToday();
+  const isFirstSunday = t.getDay() === 0 && t.getDate() <= 7;
+  const ws = weekStartOf(t);
+
+  let html = '<header><h1>Sunday</h1></header>';
+  if (isFirstSunday) {
+    html += '<p class="callout"><strong>First Sunday.</strong> ' + escapeHtml(PROBE_TEXT) + '</p>';
+  }
+
+  html += '<section aria-labelledby="h-copy"><h2 id="h-copy">Copy</h2><div class="copy-list">' +
+    '<div class="copy-item"><button type="button" data-act="copy-summary">Copy weekly summary</button></div>' +
+    '<div class="copy-item"><button type="button" data-act="copy-no">Copy Norwegian session prompt</button>' +
+    '<p class="muted small">If Norwegian voice isn’t available, run this typed. Replace {task} with the muntlig task you’re rehearsing.</p></div>' +
+    '<div class="copy-item"><button type="button" data-act="copy-es">Copy Spanish correction prompt</button></div>' +
+    '<div class="copy-item"><button type="button" data-act="copy-ja">Copy Japanese output prompt</button></div>' +
+    '</div>' +
+    '<details><summary>Preview weekly summary</summary><pre class="preview">' + escapeHtml(buildWeeklySummary(ws)) + '</pre></details>' +
+    '</section>';
+
+  // Error log manager — newest first, same-day ties broken by insertion order
+  const byRecency = key => (a, b) => b.e[key].localeCompare(a.e[key]) || b.i - a.i;
+  const indexed = db.errors.map((e, i) => ({ e, i }));
+  const open = indexed.filter(x => !x.e.closed).sort(byRecency('opened')).map(x => x.e);
+  const closed = indexed.filter(x => x.e.closed).sort(byRecency('closed')).map(x => x.e);
+  html += '<section aria-labelledby="h-errlog"><h2 id="h-errlog">Error log</h2><div class="card">';
+  if (open.length === 0) html += '<p class="muted">No open error patterns.</p>';
+  html += open.map(e => {
+    const l = lang(e.langId);
+    return '<div class="err-item"><span class="err-text"><strong>' + escapeHtml(l ? l.code : '—') + '</strong> ' + escapeHtml(e.text) +
+      '<br><span class="muted small">opened ' + escapeHtml(e.opened) + '</span></span>' +
+      '<button type="button" data-act="error-close" data-id="' + escapeHtml(e.id) + '">Close</button></div>';
+  }).join('');
+  html += '</div>';
+  if (closed.length) {
+    html += '<details><summary>Closed (' + closed.length + ')</summary><div class="card">' + closed.map(e => {
+      const l = lang(e.langId);
+      return '<div class="err-item"><span class="err-text muted"><strong>' + escapeHtml(l ? l.code : '—') + '</strong> ' + escapeHtml(e.text) +
+        '<br><span class="small">' + escapeHtml(e.opened) + ' → ' + escapeHtml(e.closed) + '</span></span></div>';
+    }).join('') + '</div></details>';
+  }
+  html += '</section>';
+
+  // Milestones
+  const ms = [...db.milestones].sort((a, b) => a.date.localeCompare(b.date));
+  html += '<section aria-labelledby="h-ms"><h2 id="h-ms">Milestones</h2><div class="card">';
+  if (ms.length === 0) html += '<p class="muted">No milestones.</p>';
+  html += ms.map(m => {
+    const l = lang(m.langId);
+    return '<div class="ms-item"><span class="err-text"><strong>' + escapeHtml(m.date) + '</strong>' +
+      (l ? ' <span class="muted">' + escapeHtml(l.code) + '</span>' : '') + ' ' + escapeHtml(m.text) + '</span>' +
+      '<button type="button" data-act="ms-del" data-id="' + escapeHtml(m.id) + '" aria-label="Remove milestone">×</button></div>';
+  }).join('');
+  html += '</div>' +
+    '<div class="row">' +
+    '<input type="date" id="ms-date" aria-label="Milestone date" value="' + todayStr() + '">' +
+    '<select id="ms-lang" aria-label="Milestone language"><option value="">—</option>' +
+    db.languages.map(l => '<option value="' + escapeHtml(l.id) + '">' + escapeHtml(l.code) + '</option>').join('') +
+    '</select>' +
+    '<input type="text" id="ms-text" aria-label="Milestone text" placeholder="Milestone" style="flex:1;min-width:160px">' +
+    '<button type="button" data-act="ms-add">Add</button>' +
+    '</div></section>';
+
+  return html;
+}
+
+/* ---------- Resources & settings ---------- */
+
+function renderSettings() {
+  let html = '<header><h1>Resources &amp; settings</h1></header>';
+
+  // Resources grouped by language then lane
+  html += '<section aria-labelledby="h-res"><h2 id="h-res">Resources</h2>';
+  for (const l of db.languages) {
+    html += '<details' + (l.tier !== 'parked' ? ' open' : '') + '><summary>' + escapeHtml(l.name) +
+      ' <span class="muted small" style="margin-left:8px">' + escapeHtml(l.tier + ' · ' + l.current + ' → ' + l.target) + '</span></summary><div class="card">';
+    for (const laneName of LANES) {
+      const items = db.resources.filter(r => r.langId === l.id && r.lane === laneName);
+      if (!items.length) continue;
+      html += items.map(r => {
+        let row = '<div class="res-item"><div class="res-head"><span>' +
+          (r.url ? '<a href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">' + escapeHtml(r.name) + ' ↗</a>' : escapeHtml(r.name)) +
+          ' <span class="lane-tag">' + escapeHtml(r.lane) + '</span></span>' +
+          '<label class="switch"><input type="checkbox" data-chg="res-active" data-res="' + escapeHtml(r.id) + '"' + (r.active ? ' checked' : '') +
+          ' aria-label="Active: ' + escapeHtml(r.name) + '"><span class="small muted">active</span></label></div>';
+        if (r.cursor) {
+          row += '<div class="row"><label class="small" style="flex-direction:row;align-items:center;gap:6px">label ' +
+            '<input type="text" data-chg="res-cursor-label" data-res="' + escapeHtml(r.id) + '" value="' + escapeHtml(r.cursor.label) + '" style="width:8em"></label>' +
+            '<label class="small" style="flex-direction:row;align-items:center;gap:6px">value ' +
+            '<input type="text" data-chg="res-cursor-value" data-res="' + escapeHtml(r.id) + '" value="' + escapeHtml(r.cursor.value) + '" style="width:10em"></label></div>';
+        }
+        row += '<input type="text" data-chg="res-notes" data-res="' + escapeHtml(r.id) + '" value="' + escapeHtml(r.notes || '') +
+          '" placeholder="Notes" aria-label="Notes for ' + escapeHtml(r.name) + '">';
+        row += '</div>';
+        return row;
+      }).join('');
+    }
+    html += '</div></details>';
+  }
+  html += '</section>';
+
+  // Template editor
+  const dayLetters = { mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S' };
+  html += '<section aria-labelledby="h-tpl"><h2 id="h-tpl">Template &amp; recipes</h2>' +
+    '<p class="muted small">Which blocks run on which weekday, block minutes, and recipe steps.</p>';
+  for (const b of db.blocks) {
+    const r = recipe(b.recipeId);
+    html += '<details><summary><span style="color:' + langColor(b) + ';margin-right:8px">●</span>' + escapeHtml(b.label) +
+      '<span class="muted small" style="margin-left:8px">' + b.minutes + ' min</span></summary><div class="card">' +
+      '<div class="row"><label class="small">Minutes <input type="number" min="5" max="180" data-chg="block-min" data-block="' + b.id +
+      '" value="' + b.minutes + '" style="width:5.5em"></label></div>' +
+      '<div class="day-toggles" style="margin-top:8px" role="group" aria-label="Days for ' + escapeHtml(b.label) + '">' +
+      DAYS.map(dk => '<button type="button" data-act="day-toggle" data-block="' + escapeHtml(b.id) + '" data-day="' + dk +
+        '" aria-pressed="' + ((db.template[dk] || []).includes(b.id) ? 'true' : 'false') + '" aria-label="' +
+        escapeHtml(DAY_NAMES[dk]) + '">' + dayLetters[dk] + '</button>').join('') +
+      '</div>';
+    if (r) {
+      html += '<h3 class="small muted" style="margin-top:12px">Steps</h3>' +
+        r.steps.map((st, i) =>
+          '<div class="step-edit">' +
+          '<input type="number" min="1" max="120" data-chg="step-min" data-recipe="' + escapeHtml(r.id) + '" data-idx="' + i + '" value="' + st.minutes + '" aria-label="Step ' + (i + 1) + ' minutes">' +
+          '<input type="text" data-chg="step-text" data-recipe="' + escapeHtml(r.id) + '" data-idx="' + i + '" value="' + escapeHtml(st.text) + '" aria-label="Step ' + (i + 1) + ' text">' +
+          '<button type="button" data-act="step-del" data-recipe="' + escapeHtml(r.id) + '" data-idx="' + i + '" aria-label="Remove step ' + (i + 1) + '">×</button>' +
+          '</div>').join('') +
+        '<button type="button" data-act="step-add" data-recipe="' + escapeHtml(r.id) + '">+ step</button>';
+    }
+    html += '</div></details>';
+  }
+  html += '</section>';
+
+  // Phases
+  html += '<section aria-labelledby="h-ph"><h2 id="h-ph">Phases</h2>' +
+    '<p class="muted small">Switching the active phase activates/deactivates the resources it lists.</p>';
+  for (const l of db.languages) {
+    const phases = db.phases.filter(p => p.langId === l.id);
+    if (!phases.length) continue;
+    html += '<details open><summary>' + escapeHtml(l.name) + '</summary><div class="card">' +
+      phases.map(p =>
+        '<label class="phase-item" style="cursor:pointer"><input type="radio" name="phase-' + escapeHtml(l.id) + '" data-chg="phase-pick" data-lang="' + escapeHtml(l.id) +
+        '" data-phase="' + escapeHtml(p.id) + '"' + (p.active ? ' checked' : '') + '>' +
+        '<span><strong>' + escapeHtml(p.name) + '</strong>' + (p.level ? ' <span class="muted small">(' + escapeHtml(p.level) + ')</span>' : '') +
+        '<br><span class="muted small">' + escapeHtml(p.startsWhen || '') + '</span></span></label>'
+      ).join('') + '</div></details>';
+  }
+  html += '</section>';
+
+  // Settings
+  html += '<section aria-labelledby="h-set"><h2 id="h-set">Settings</h2><div class="card">' +
+    '<label class="switch"><input type="checkbox" data-chg="set-weekstart"' + (db.settings.weekStartsMonday ? ' checked' : '') +
+    '> Week starts Monday</label><br>' +
+    '<label class="small" style="margin-top:8px">Timezone (informational — dates use this device’s clock)' +
+    '<input type="text" data-chg="set-timezone" value="' + escapeHtml(db.settings.timezone) + '"></label>' +
+    '</div></section>';
+
+  // Data
+  html += '<section aria-labelledby="h-data"><h2 id="h-data">Data</h2><div class="card">' +
+    '<div class="row">' +
+    '<button type="button" data-act="export-download">Download data.json</button>' +
+    '<button type="button" data-act="export-copy">Copy export</button>' +
+    '</div>' +
+    '<h3 class="small muted" style="margin-top:14px">Import</h3>' +
+    '<div class="row" style="margin-top:6px">' +
+    '<input type="file" id="import-file" accept=".json,application/json" data-chg="import-file" aria-label="Import data.json file">' +
+    '</div>' +
+    '<textarea id="import-paste" placeholder="…or paste exported JSON here" aria-label="Paste exported JSON" style="margin-top:8px"></textarea>' +
+    '<div class="row"><button type="button" data-act="import-paste">Import pasted JSON</button></div>' +
+    '<p id="data-msg" class="small muted" role="status" aria-live="polite"></p>' +
+    '</div>' +
+    '<div class="card danger-zone">' +
+    '<h3 class="small">Reset</h3>' +
+    '<p class="muted small">Wipes everything and reloads the preloaded plan. Type <strong>RESET</strong> to confirm. A backup of the current data is kept in localStorage under <code>language-hq.pre-reset</code>.</p>' +
+    '<div class="row"><input type="text" id="reset-confirm" aria-label="Type RESET to confirm" placeholder="Type RESET" autocomplete="off">' +
+    '<button type="button" class="btn-danger" data-act="reset">Reset</button></div>' +
+    '</div></section>';
+
+  return html;
+}
+
+/* ================= Actions ================= */
+
+async function copyToClipboard(text, btn) {
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch (e) {
+    // Fallback for older Safari / non-secure contexts
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand('copy');
+      ta.remove();
+    } catch (e2) { ok = false; }
+  }
+  if (btn) {
+    const original = btn.textContent;
+    btn.textContent = ok ? 'Copied ✓' : 'Copy failed';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+  }
+}
+
+function dataMsg(text) {
+  const el = document.getElementById('data-msg');
+  if (el) el.textContent = text;
+}
+
+function importDoc(text) {
+  let doc;
+  try {
+    doc = migrate(JSON.parse(text));
+  } catch (e) {
+    dataMsg('Import failed: ' + e.message);
+    return;
+  }
+  // Only persist once the imported document has rendered successfully —
+  // a bad import must never brick the app or clobber stored data.
+  const prevDb = db;
+  db = doc;
+  try {
+    render();
+  } catch (e) {
+    db = prevDb;
+    render();
+    dataMsg('Import failed: the document did not render (' + e.message + '). Nothing was changed.');
+    return;
+  }
+  try {
+    const prev = localStorage.getItem(STORAGE_KEY);
+    if (prev) localStorage.setItem(STORAGE_KEY + '.pre-import', prev);
+  } catch (e) {}
+  save();
+  // render() replaced #data-msg, so set the message after re-render
+  dataMsg('Imported. Previous data backed up under ' + STORAGE_KEY + '.pre-import.');
+}
+
+function applyPhase(langId, phaseId) {
+  const phase = db.phases.find(p => p.id === phaseId);
+  if (!phase) return;
+  db.phases.filter(p => p.langId === langId).forEach(p => { p.active = (p.id === phaseId); });
+  const l = lang(langId);
+  if (l) l.phase = phaseId;
+  (phase.activates || []).forEach(rid => { const r = res(rid); if (r) r.active = true; });
+  (phase.deactivates || []).forEach(rid => { const r = res(rid); if (r) r.active = false; });
+  Object.entries(phase.optional || {}).forEach(([bid, opt]) => { const b = block(bid); if (b) b.optional = opt; });
+  save();
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+
+  if (act === 'nav') { location.hash = el.dataset.view; return; }
+
+  if (act === 'status') { setStatus(el.dataset.date, el.dataset.block, el.dataset.status); render(); return; }
+  if (act === 'tile-cycle') { cycleStatus(el.dataset.date, el.dataset.block); render(); return; }
+
+  if (act === 'cursor-inc') {
+    const r = res(el.dataset.res);
+    if (r && r.cursor && typeof r.cursor.value === 'number') { r.cursor.value += 1; save(); render(); }
+    return;
+  }
+
+  if (act === 'input-quick') {
+    db.inputLog.push({ id: uid(), date: todayStr(), langId: el.dataset.lang, minutes: 30, note: '' });
+    save(); render(); return;
+  }
+  if (act === 'input-add') {
+    const min = parseInt(document.getElementById('custom-min').value, 10);
+    const langId = document.getElementById('custom-lang').value;
+    if (min > 0) {
+      db.inputLog.push({ id: uid(), date: todayStr(), langId, minutes: min, note: '' });
+      save(); render();
+    }
+    return;
+  }
+  if (act === 'input-del') {
+    db.inputLog = db.inputLog.filter(x => x.id !== el.dataset.id);
+    save(); render(); return;
+  }
+
+  if (act === 'error-save') {
+    const text = document.getElementById('err-text').value.trim();
+    const langId = document.getElementById('err-lang').value;
+    if (text) {
+      db.errors.push({ id: uid(), langId, text, opened: todayStr(), closed: null });
+      save(); render();
+    }
+    return;
+  }
+  if (act === 'error-close') {
+    const err = db.errors.find(x => x.id === el.dataset.id);
+    if (err) { err.closed = todayStr(); save(); render(); }
+    return;
+  }
+
+  if (act === 'copy-summary') { copyToClipboard(buildWeeklySummary(weekStartOf(appToday())), el); return; }
+  if (act === 'copy-no') { copyToClipboard(noPrompt(), el); return; }
+  if (act === 'copy-es') { copyToClipboard(ES_PROMPT, el); return; }
+  if (act === 'copy-ja') { copyToClipboard(JA_PROMPT, el); return; }
+
+  if (act === 'week-prev') { weekOffset--; render(); return; }
+  if (act === 'week-next') { weekOffset++; render(); return; }
+  if (act === 'week-now') { weekOffset = 0; render(); return; }
+
+  if (act === 'ms-add') {
+    const date = document.getElementById('ms-date').value;
+    const text = document.getElementById('ms-text').value.trim();
+    const langId = document.getElementById('ms-lang').value || null;
+    if (date && text) {
+      db.milestones.push({ id: uid(), langId, date, text });
+      save(); render();
+    }
+    return;
+  }
+  if (act === 'ms-del') {
+    db.milestones = db.milestones.filter(m => m.id !== el.dataset.id);
+    save(); render(); return;
+  }
+
+  if (act === 'day-toggle') {
+    const dk = el.dataset.day, bid = el.dataset.block;
+    const list = db.template[dk] || (db.template[dk] = []);
+    const i = list.indexOf(bid);
+    if (i >= 0) list.splice(i, 1); else list.push(bid);
+    save(); render(); return;
+  }
+  if (act === 'step-add') {
+    const r = recipe(el.dataset.recipe);
+    if (r) { r.steps.push({ minutes: 5, text: '' }); save(); render(); }
+    return;
+  }
+  if (act === 'step-del') {
+    const r = recipe(el.dataset.recipe);
+    if (r) { r.steps.splice(parseInt(el.dataset.idx, 10), 1); save(); render(); }
+    return;
+  }
+
+  if (act === 'export-download') {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'data.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    return;
+  }
+  if (act === 'export-copy') { copyToClipboard(JSON.stringify(db, null, 2), el); return; }
+  if (act === 'import-paste') {
+    const text = document.getElementById('import-paste').value.trim();
+    if (text) importDoc(text);
+    else dataMsg('Paste exported JSON first.');
+    return;
+  }
+  if (act === 'reset') {
+    const input = document.getElementById('reset-confirm');
+    if (input.value.trim() !== 'RESET') { dataMsg('Type RESET (all caps) to confirm.'); return; }
+    try {
+      const prev = localStorage.getItem(STORAGE_KEY);
+      if (prev) localStorage.setItem(STORAGE_KEY + '.pre-reset', prev);
+    } catch (e) {}
+    db = seed();
+    save();
+    render();
+    dataMsg('Reset to the preloaded plan. Previous data backed up under ' + STORAGE_KEY + '.pre-reset.');
+    return;
+  }
+});
+
+document.addEventListener('change', e => {
+  const el = e.target.closest('[data-chg]');
+  if (!el) return;
+  const chg = el.dataset.chg;
+
+  if (chg === 'cursor-set' || chg === 'res-cursor-value') {
+    const r = res(el.dataset.res);
+    if (r && r.cursor) {
+      const v = el.value.trim();
+      // All-digit input stores a number (so the +1 arrow works — and a typo
+      // can't permanently demote a numeric cursor to a string); anything
+      // else stores the string.
+      r.cursor.value = /^-?\d+$/.test(v) ? parseInt(v, 10) : v;
+      save();
+    }
+    return;
+  }
+  if (chg === 'res-cursor-label') {
+    const r = res(el.dataset.res);
+    if (r && r.cursor) { r.cursor.label = el.value.trim(); save(); }
+    return;
+  }
+  if (chg === 'note-set') {
+    const s = db.sessions.find(x => x.id === el.dataset.session);
+    if (s) { s.note = el.value.trim(); save(); }
+    return;
+  }
+  if (chg === 'res-active') {
+    const r = res(el.dataset.res);
+    if (r) { r.active = el.checked; save(); render(); }
+    return;
+  }
+  if (chg === 'res-notes') {
+    const r = res(el.dataset.res);
+    if (r) { r.notes = el.value; save(); }
+    return;
+  }
+  if (chg === 'block-min') {
+    const b = block(el.dataset.block);
+    const v = parseInt(el.value, 10);
+    if (b && v > 0) { b.minutes = v; save(); }
+    return;
+  }
+  if (chg === 'step-min') {
+    const r = recipe(el.dataset.recipe);
+    const v = parseInt(el.value, 10);
+    if (r && r.steps[el.dataset.idx] && v > 0) { r.steps[el.dataset.idx].minutes = v; save(); }
+    return;
+  }
+  if (chg === 'step-text') {
+    const r = recipe(el.dataset.recipe);
+    if (r && r.steps[el.dataset.idx]) { r.steps[el.dataset.idx].text = el.value; save(); }
+    return;
+  }
+  if (chg === 'phase-pick') {
+    applyPhase(el.dataset.lang, el.dataset.phase);
+    render();
+    return;
+  }
+  if (chg === 'set-weekstart') { db.settings.weekStartsMonday = el.checked; save(); render(); return; }
+  if (chg === 'set-timezone') { db.settings.timezone = el.value.trim(); save(); return; }
+  if (chg === 'import-file') {
+    const file = el.files && el.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => importDoc(String(reader.result));
+    reader.onerror = () => dataMsg('Could not read the file.');
+    reader.readAsText(file);
+    return;
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (e.target.id === 'err-text') { e.preventDefault(); document.querySelector('[data-act="error-save"]').click(); }
+  if (e.target.id === 'custom-min') { e.preventDefault(); document.querySelector('[data-act="input-add"]').click(); }
+  if (e.target.id === 'ms-text') { e.preventDefault(); document.querySelector('[data-act="ms-add"]').click(); }
+});
+
+window.addEventListener('hashchange', render);
+render();
+
+/* ================= Service worker ================= */
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Service worker registration failed:', err));
+  });
+}
+</script>
+</body>
+</html>
