@@ -560,9 +560,16 @@ function renderBlockCard(bid, ds) {
     '</div></div>';
 
   if (r && r.steps.length) {
-    html += '<ol class="steps">' + r.steps.map(st =>
-      '<li><span class="min">' + st.minutes + '′</span><span>' + escapeHtml(st.text) + '</span></li>'
-    ).join('') + '</ol>';
+    // Steps that name a resource (Anki, Forvo, NHK…) get a tappable link
+    // right on the step; the block's primary resource is linked below.
+    html += '<ol class="steps">' + r.steps.map(st => {
+      const sr = st.resourceId ? res(st.resourceId) : null;
+      const showLink = sr && sr.active && sr.url && !(resource && sr.id === resource.id);
+      const link = showLink
+        ? ' <a class="step-link" href="' + escapeHtml(resourceUrl(sr)) + '" target="_blank" rel="noopener">' + escapeHtml(sr.name) + ' ↗</a>'
+        : '';
+      return '<li><span class="min">' + st.minutes + '′</span><span>' + escapeHtml(st.text) + link + '</span></li>';
+    }).join('') + '</ol>';
   }
 
   if (resource) {

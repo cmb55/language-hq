@@ -117,6 +117,7 @@ label { display: inline-flex; flex-direction: column; gap: 4px; }
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+.step-link { white-space: nowrap; font-size: 0.9em; }
 
 .res-row {
   display: flex;

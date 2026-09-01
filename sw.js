@@ -3,7 +3,7 @@
    the old version. All paths are relative so the app works when hosted
    under a subpath (e.g. GitHub Pages /language-hq/). */
 
-const CACHE_VERSION = 'language-hq-v2';
+const CACHE_VERSION = 'language-hq-v3';
 
 const SHELL = [
   './',
