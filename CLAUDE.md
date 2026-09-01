@@ -30,7 +30,8 @@ All user data is one JSON document in `localStorage` under the key `language-hq`
 - Prefer fewer features done well. No login, no notifications, no charts beyond simple counts, no analytics.
 - Dates are local-device `YYYY-MM-DD` strings; weeks are Monday-first by default (`settings.weekStartsMonday`).
 - Schema extensions beyond the brief's §3 (all documented in README.md): `blocks[].resourceId`, `blocks[].optional`, `phases[].activates/deactivates/optional/level`.
-- Seed content in `seed()` must match BUILD-BRIEF.md §5 exactly; prompt texts must match §7 exactly; the weekly summary must match the §6 format.
+- Seed content in `seed()` must match BUILD-BRIEF.md §5 exactly, except resource URLs, which deep-link to the logged-in page for each tool (listed in README.md). Prompt texts must match §7 exactly; the weekly summary must match the §6 format.
+- A resource `url` may contain `{cursor}`; `resourceUrl()` substitutes the current cursor value when rendering a link. Use it for anything with per-chapter/per-episode pages.
 
 ## Testing
 

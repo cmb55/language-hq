@@ -54,9 +54,9 @@ function seed() {
     ],
     resources: [
       // Norwegian
-      { id: 'now1', langId: 'no', lane: 'course', name: 'Norwegian on the Web 1', url: 'https://www.ntnu.edu/now', cursor: { label: 'chapter', value: 1 }, active: true, notes: '' },
-      { id: 'now2', langId: 'no', lane: 'course', name: 'NoW2', url: 'https://www.ntnu.edu/now2', cursor: { label: 'chapter', value: 1 }, active: false, notes: 'Inactive until phase 2.' },
-      { id: 'anki-no', langId: 'no', lane: 'srs', name: 'Anki (AnkiMobile + AnkiWeb)', url: 'https://apps.ankiweb.net', cursor: null, active: true, notes: '' },
+      { id: 'now1', langId: 'no', lane: 'course', name: 'Norwegian on the Web 1', url: 'https://www.ntnu.edu/web/now/chapter{cursor}', cursor: { label: 'chapter', value: 1 }, active: true, notes: '' },
+      { id: 'now2', langId: 'no', lane: 'course', name: 'NoW2', url: 'https://www.ntnu.edu/web/now2/{cursor}/{cursor}a', cursor: { label: 'chapter', value: 1 }, active: false, notes: 'Inactive until phase 2.' },
+      { id: 'anki-no', langId: 'no', lane: 'srs', name: 'Anki (AnkiMobile + AnkiWeb)', url: 'https://ankiweb.net', cursor: null, active: true, notes: '' },
       { id: 'nfb', langId: 'no', lane: 'input', name: 'Norsk for Beginners (podcast)', url: '', cursor: { label: 'episode', value: 1 }, active: true, notes: '' },
       { id: 'lnn', langId: 'no', lane: 'input', name: 'Lær norsk nå!', url: '', cursor: { label: 'episode', value: 1 }, active: false, notes: 'Inactive until phase 2.' },
       { id: 'klartale', langId: 'no', lane: 'input', name: 'Klar Tale', url: 'https://www.klartale.no', cursor: null, active: false, notes: 'Inactive until phase 2.' },
@@ -65,18 +65,18 @@ function seed() {
       { id: 'hkdir', langId: 'no', lane: 'exam', name: 'HK-dir Norskprøven samples and registration', url: 'https://prove.hkdir.no', cursor: null, active: true, notes: '' },
       { id: 'muntlig', langId: 'no', lane: 'exam', name: 'muntlig.com', url: 'https://muntlig.com', cursor: null, active: false, notes: 'Inactive until phase 3.' },
       // Spanish
-      { id: 'kwiziq', langId: 'es', lane: 'course', name: 'Kwiziq Spanish', url: 'https://spanish.kwiziq.com', cursor: { label: 'level', value: 'placement pending' }, active: true, notes: '' },
-      { id: 'anki-es', langId: 'es', lane: 'srs', name: 'Anki', url: 'https://apps.ankiweb.net', cursor: null, active: true, notes: '' },
+      { id: 'kwiziq', langId: 'es', lane: 'course', name: 'Kwiziq Spanish', url: 'https://spanish.kwiziq.com/my-languages/spanish', cursor: { label: 'level', value: 'placement pending' }, active: true, notes: '' },
+      { id: 'anki-es', langId: 'es', lane: 'srs', name: 'Anki', url: 'https://ankiweb.net', cursor: null, active: true, notes: '' },
       { id: 'radioamb', langId: 'es', lane: 'input', name: 'Radio Ambulante', url: 'https://radioambulante.org', cursor: { label: 'episode', value: 'latest' }, active: true, notes: '' },
       { id: 'elhilo', langId: 'es', lane: 'input', name: 'El Hilo', url: 'https://elhilo.audio', cursor: null, active: true, notes: '' },
-      { id: 'langcorrect', langId: 'es', lane: 'output', name: 'LangCorrect', url: 'https://langcorrect.com', cursor: { label: 'entries', value: 0 }, active: true, notes: '' },
+      { id: 'langcorrect', langId: 'es', lane: 'output', name: 'LangCorrect', url: 'https://langcorrect.com/journal', cursor: { label: 'entries', value: 0 }, active: true, notes: '' },
       { id: 'dele', langId: 'es', lane: 'exam', name: 'Instituto Cervantes DELE models', url: 'https://examenes.cervantes.es', cursor: null, active: true, notes: '' },
       { id: 'cronometro', langId: 'es', lane: 'exam', name: 'El Cronómetro C2 (book)', url: '', cursor: null, active: false, notes: 'Inactive until phase 2.' },
       { id: 'siele', langId: 'es', lane: 'exam', name: 'SIELE', url: 'https://siele.org', cursor: null, active: true, notes: '' },
       // Japanese
-      { id: 'bunpro', langId: 'ja', lane: 'course', name: 'Bunpro', url: 'https://bunpro.jp', cursor: { label: 'JLPT level', value: 'placement pending' }, active: true, notes: '' },
-      { id: 'anki-ja', langId: 'ja', lane: 'srs', name: 'Anki + Yomitan', url: 'https://apps.ankiweb.net', cursor: null, active: true, notes: '' },
-      { id: 'satori', langId: 'ja', lane: 'input', name: 'Satori Reader', url: 'https://www.satorireader.com', cursor: { label: 'episode', value: 'choose a series' }, active: true, notes: '' },
+      { id: 'bunpro', langId: 'ja', lane: 'course', name: 'Bunpro', url: 'https://bunpro.jp/reviews', cursor: { label: 'JLPT level', value: 'placement pending' }, active: true, notes: '' },
+      { id: 'anki-ja', langId: 'ja', lane: 'srs', name: 'Anki + Yomitan', url: 'https://ankiweb.net', cursor: null, active: true, notes: '' },
+      { id: 'satori', langId: 'ja', lane: 'input', name: 'Satori Reader', url: 'https://www.satorireader.com/dashboard', cursor: { label: 'episode', value: 'choose a series' }, active: true, notes: '' },
       { id: 'nhk', langId: 'ja', lane: 'input', name: 'NHK News Web Easy', url: 'https://www3.nhk.or.jp/news/easy/', cursor: null, active: true, notes: '' },
       { id: 'yuyu', langId: 'ja', lane: 'input', name: 'YUYU Nihongo Podcast', url: '', cursor: null, active: true, notes: '' },
       { id: 'jlpt', langId: 'ja', lane: 'exam', name: 'JLPT official samples', url: 'https://www.jlpt.jp/e/', cursor: null, active: true, notes: '' },
@@ -276,6 +276,15 @@ function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
+
+// A resource's link. A URL may contain {cursor}; it is replaced with the
+// current cursor value, so NoW chapter 4 opens chapter 4's page.
+function resourceUrl(r) {
+  if (!r || !r.url) return '';
+  if (!r.url.includes('{cursor}')) return r.url;
+  const v = r.cursor ? encodeURIComponent(String(r.cursor.value)) : '';
+  return r.url.replaceAll('{cursor}', v);
 }
 
 // A block's resource on Today: the block's own resource if active; if a phase
@@ -559,7 +568,7 @@ function renderBlockCard(bid, ds) {
   if (resource) {
     html += '<div class="res-row">';
     if (resource.url) {
-      html += '<a href="' + escapeHtml(resource.url) + '" target="_blank" rel="noopener">' + escapeHtml(resource.name) + ' ↗</a>';
+      html += '<a href="' + escapeHtml(resourceUrl(resource)) + '" target="_blank" rel="noopener">' + escapeHtml(resource.name) + ' ↗</a>';
     } else {
       html += '<span>' + escapeHtml(resource.name) + '</span>';
     }
@@ -733,7 +742,7 @@ function renderSettings() {
       if (!items.length) continue;
       html += items.map(r => {
         let row = '<div class="res-item"><div class="res-head"><span>' +
-          (r.url ? '<a href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">' + escapeHtml(r.name) + ' ↗</a>' : escapeHtml(r.name)) +
+          (r.url ? '<a href="' + escapeHtml(resourceUrl(r)) + '" target="_blank" rel="noopener">' + escapeHtml(r.name) + ' ↗</a>' : escapeHtml(r.name)) +
           ' <span class="lane-tag">' + escapeHtml(r.lane) + '</span></span>' +
           '<label class="switch"><input type="checkbox" data-chg="res-active" data-res="' + escapeHtml(r.id) + '"' + (r.active ? ' checked' : '') +
           ' aria-label="Active: ' + escapeHtml(r.name) + '"><span class="small muted">active</span></label></div>';

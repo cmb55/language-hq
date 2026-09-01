@@ -66,7 +66,10 @@ Reasonable choices made during the build (per the brief's instruction to note th
 - **"Monologues recorded"** in the weekly summary = NO-chapter sessions marked Done that week (the monologue is a step of that recipe; Floor omits it).
 - **Session notes**: a small note field appears on a block card once a status is set; notes flow into the weekly summary's `Notes:` line.
 - **`{task}` in the Norwegian prompt** is left literal for you to replace with the muntlig task you're rehearsing; `{level}` is filled from the active Norwegian phase.
-- **Resources with no URL in the brief** (podcasts, books, the Chinese apps) are shown without links; Anki entries all link to ankiweb.net.
+- **Resource links deep-link to the page you use once logged in**, not the homepage: Anki → `ankiweb.net`, Kwiziq → your dashboard (`/my-languages/spanish`, the path Kwiziq's own FAQ calls "Dashboard"), Bunpro → `/reviews`, Satori Reader → `/dashboard` (its signed-in landing; there is no separate "library" page), LangCorrect → `/journal` ("My Journal" in its sidebar). If a site changes a path, edit `url` in `seed()`.
+- **`{cursor}` in a resource URL is replaced with the cursor value** when the link is built, so Norwegian on the Web opens the chapter you're on: `https://www.ntnu.edu/web/now/chapter{cursor}` → chapter 4 opens `…/chapter4`. NoW2 uses `…/web/now2/{cursor}/{cursor}a` (section A of that chapter, which is how NTNU structures NoW2).
+- **On iPhone, the Anki tile means "open AnkiMobile."** The link goes to AnkiWeb, which is fine for a quick look, but reviews belong in the AnkiMobile app — tap the app, not the link.
+- **Resources with no URL in the brief** (podcasts, books, the Chinese apps) are shown without links.
 - **NoW2 is seeded with a `chapter 1` cursor** even though the brief lists it without one: it's the phase-2 course and there is deliberately no "add a cursor" UI, so it ships ready to track.
 - **`langId` is `null` on SUN-review** (and its recipe) — it's a cross-language block, shown in neutral gray. Chinese ships with `phase: null` since the brief defines no Chinese phases.
 - **Dates use the device clock.** The `timezone` setting is stored but informational. For testing or backfilling, `?date=YYYY-MM-DD` in the URL makes Today render as that date.

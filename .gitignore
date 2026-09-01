@@ -1,1 +1,7 @@
 .claude/
+
+# Personal data exports — never commit these
+data.json
+data (*).json
+data-*.json
+*.export.json
